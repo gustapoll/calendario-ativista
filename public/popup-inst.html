@@ -1,0 +1,44 @@
+<style>
+body {font-family: Roboto, Helvetica, sans-serif;}
+.popuper {
+    background:none;
+    top: 10%;
+    margin:auto;
+    width:80%;max-width:360px;
+}
+.popup-message {
+    background:black;
+    color:#FFF;
+    margin:auto;
+    width:80%;max-width:360px;
+    padding:20px;
+    transition: top 300ms cubic-bezier(0.17, 0.04, 0.03, 0.94);
+}
+.popup-message h3 {
+  color:#FFF;
+}
+#toggle {
+  position:absolute;
+  left:-100%;top:-100%;
+  appearance:none;
+}
+#toggle + label {
+  cursor:pointer;
+  padding:10px;
+  background:black;
+    color:#FFF;
+    float:right;
+}
+#toggle:checked ~ .popup-message, #toggle:checked, #toggle:checked + label {
+display:none;
+}
+</style>
+<div class="popuper">
+    <input type="checkbox" name="toggle" id="toggle" />
+    <label for="toggle">  X  </label>
+    <div class="popup-message">
+        <h3>Mudan&ccedil;as na pol&iacute;tica de dados do Instagram</h3>
+        <p>Devido &agrave;s mudan&ccedil;as na pol&iacute;tica de dados do Instagram, o Calend&aacute;rio Dissidente est&aacute; desatualizado desde 16 de novembro. </p>
+        <p>Esperamos resolver este problema em breve!</p>
+    </div>
+</div>
