@@ -2,14 +2,14 @@
   "name": "functions",
   "description": "Calendario Ativista Backend functions",
   "scripts": {
-    "lint": "eslint . --fix",
+    "lint": "eslint ./functions/ --fix",
     "serve": "npm run start",
-    "start": "node server.js"
+    "start": "node ./functions/server.js"
   },
   "engines": {
     "node": "14"
   },
-  "main": "index.js",
+  "main": "./functions/server.js",
   "dependencies": {
     "express": "^4.17.1",
     "firebase-admin": "^9.8.0"
