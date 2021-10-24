@@ -1,11 +1,4 @@
-// const onRequest = require('./functions')
-
-const express = require('express')
-const app = express()
-const port = process.env.PORT || 80
-
-
-const constants = {
+module.exports = {
   HASHTAG_LABELS: [
     "#coleraalegria",
     "#desenhospelademocracia",
@@ -13,6 +6,7 @@ const constants = {
     "#foragarimpoforacovid",
     "#projetemos",
     "#mariellepresente",
+    "hashtag__test",
   ],
 
   TAGS: [
@@ -86,22 +80,10 @@ const constants = {
   ].sort(),
 
 
+  LABELS: [
+    'F'
+  ],
+
   // ID of the backup folder in Google Drive
   FOLDER_ID: "1UlkoCZ1jjEdPI8CwC2dViBFI-QyUVaK7",
 };
-
-onRequest = {
-  hashtags: (request, response) => {
-    response.send({"hashtags": constants.HASHTAG_LABELS, "tags": constants.TAGS});
-  }
-}
-
-app.get('/', (req, res) => {
-  res.send('Calendario Ativista Server!')
-});
-
-app.get('/hashtags', onRequest.hashtags);
-
-app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`)
-});
