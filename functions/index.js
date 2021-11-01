@@ -1,90 +1,109 @@
-const constants = require('./constants');
+var fs = require('fs');
+
+var glob = require("glob");
+
+var _ = require('lodash');
+var fp = require('lodash/fp');
+
+var __ = undefined;
 
 
-const _ = require('lodash');
-const fp = require('lodash/fp');
+var { Storage } = require('@google-cloud/storage');
 
-const __ = undefined;
-
-const { Storage } = require('@google-cloud/storage');
-
-const GOOGLE_APPLICATION_CREDENTIALS = process.env.GOOGLE_APPLICATION_CREDENTIALS || './auth/google-credentials.json'
+var GOOGLE_APPLICATION_CREDENTIALS = process.env.GOOGLE_APPLICATION_CREDENTIALS || './auth/google-credentials.json'
 
 var gcs = new Storage({
   projectId: 'calendario-ativista',
   keyFilename: GOOGLE_APPLICATION_CREDENTIALS
 });
 
-var bucket = gcs.bucket('calendario-ativista.appspot.com');
 
+var admin = require('firebase-admin');
+
+var { HASHTAG_LABELS, LABELS, TAGS } = require('./constants');
+
+admin.initializeApp({
+  credential: admin.credential.cert(GOOGLE_APPLICATION_CREDENTIALS)
+});
+
+var db = admin.firestore();
+
+
+var freeze = obj => _.cloneDeep(obj)
+
+/** re-used functions */
+var paramsSchema = [
+  { name: 'year',  format: '([\\d]{4})' },
+  { name: 'month', format: '(0[1-9]|1[0-2])' },
+  { name: 'day',   format: '(0[1-9]|[12][0-9]|3[01])' },
+  { name: 'hashtag', format: `(${HASHTAG_LABELS.join('|')})` },
+  { name: 'label', format: `(${LABELS.join('|')})` },
+  { name: 'name',  format: '([\\w_-]+\\.(?:png|jpg))' },
+]
+
+var pParamFormat = fp.pipe(
+  fp.map(param          => param.value ?? param.format),
+  fp.reduce((acc, elem) => acc ? `${acc}/${elem}` : elem, __),
+  rgx                   => new RegExp(`${rgx}`)
+);
+
+/*******/
 
 onRequest = {}
 
 onRequest.hashtags = (request, response) => {
-  response.send({"hashtags": constants.HASHTAG_LABELS, "tags": constants.TAGS});
+  response.send({"hashtags": HASHTAG_LABELS, "tags": TAGS});
 }
 
-onRequest.image = (req, res) => {
+onRequest.image = async (req, res) => {
+  pParse = (req) => fp.map(param => _.set(param, 'value', req.query[param.name]));
 
-  const paramsSchema = [
-    { name: 'hashtag', format: `(${constants.HASHTAG_LABELS.join('|')})` },
-    { name: 'date',    format:  '[\\d]{4}[\\-](0[1-9]|1[0-2])[\\-](0[1-9]|[12][0-9]|3[01])' },
-    { name: 'label',   format: `(${constants.LABELS.join('|')})` },
-    { name: 'name',    format: '\\w+\\.(png|jpg)' },
-  ]
+  params = pParse(req)(paramsSchema)
 
-  const pParse = (req) => fp.map(param => _.set(param, 'value', req.query[param.name]));
+  format = pParamFormat(params);
 
-  const params = pParse(req)(paramsSchema)
+  postRef = db.collection("posts")
 
-  const pParamFormat = fp.pipe(
-    fp.map(param          => param.value ?? param.format),
-    fp.reduce((acc, elem) => acc ? `${acc}/${elem}` : elem, __),
-    rgx                   => new RegExp(`^${rgx}$`)
-  );
+  validation = { get isValid () { return this.value ? this.format.exec(this.value) : __ } };
 
-  const format = pParamFormat(params);
-
-  /** request flow control pipelines */
-
-  const pOnError = fp.pipe(
-    err => (console.log(err), err),
-    ()  => ({files: [], error: true}),
-    obj => res.send(obj)
-  );
-
-  const pOnSuccess = fp.pipe(
-    fp.map(file    => file.name),
-    fp.filter(name => format.exec(name)),
-    names          => (console.log(names), names),
-    names          => ({files: names, error: false}),
-    obj            => res.send(obj)
-  );
-
-  /** main pipeline */
-
-  const validation = { get isValid () { return this?.value ? this.format_rgx.exec(this.value) : __ } };
-
-  fp.pipe(
+  requestPosts = await fp.pipe(
     fp.map(param          =>  _.set(param, 'isValid', validation)),
-    fp.map(param          =>  param.isValid ? param.value : __),      // [str] -> [str]: replace invalid params by none
-    fp.reduce((acc, elem) =>  !acc ? [elem]                           // [str] -> [str]: drop after first undefined param
-                            : acc[acc.length - 1] ? acc.concat(elem) 
-                            : acc, __),
-    arr                   =>  arr[arr.length - 1] ? arr               // [str] -> [str]: drop last elem if undefined
-                            : arr.slice(0, -1),
-    fp.reduce((acc, elem) =>  acc ? `${acc}/${elem}` : elem, __),     // [str] ->  str : build object path in storage
-    obj                   =>  /\w+\.(png|jpg)$/.exec(obj) ? obj       //  str  ->  str : identity if file
-                            : /\/[\w_-]+$/.exec(obj) ? `${obj}/`      //               : add `/` if folder
-                            : __,                                     //               : otherwise undefined
-    obj                   =>  ({autoPaginate: false, prefix: obj}),   //  str  -> dict : set storage query
-    query                 =>  (console.log(query), query),            // *logging*
-    query                 =>  bucket.getFiles(query,                  // *request*
-      (err, files)        =>  err ? pOnError(err)
-                            : pOnSuccess(files)
-    )
+    fp.map(param          =>  param.isValid ? param : __),
+    fp.filter(param       => param.value),
+    fp.reduce((acc, elem) => acc.where(elem.name, "==", elem.value), postRef),
+    query                 => query.get()
   )(params)
-}
 
+  posts = []
+  requestPosts.forEach(doc => posts.push(doc.data()));
+
+  aggByKeys = fp.reduce((agg, key) => 
+    fp.pipe(
+      fp.groupBy(dict        => dict[key]),
+      dict                   => Object.entries(dict),
+      fp.reduce((acc, [k,v]) => _.set(acc, k, agg(v)), {})
+    )
+  , x => x)
+
+  aggRes = aggByKeys(['label', 'hashtag', 'date'])
+
+  allTags = fp.pipe(
+    fp.groupBy(dict        => dict.date),
+    dict                   => Object.entries(dict),
+    fp.reduce((acc, [k,v]) => _.set(acc, k, [...new Set(v.flatMap(x => x.tags))]), {}),
+  )
+
+  formatRes = fp.pipe(
+    fp.groupBy(x => x.date),
+    x            => Object.keys(x),
+    fp.reduce((acc, date) => _.set(acc, date, ({
+      'used_tags': allTags(posts)[date], 
+      'images': aggRes(posts)[date],
+      'top_3': aggRes(posts)[date]?.top_3
+    })), {})
+  )
+
+  res.send(formatRes(posts))
+}
 
 module.exports = onRequest

@@ -7,6 +7,7 @@ module.exports = {
     "#projetemos",
     "#mariellepresente",
     "hashtag__test",
+    "top_3"
   ],
 
   TAGS: [
@@ -81,7 +82,10 @@ module.exports = {
 
 
   LABELS: [
-    'F'
+    '1',
+    '2',
+    '3',
+    '4'
   ],
 
   // ID of the backup folder in Google Drive
