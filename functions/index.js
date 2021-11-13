@@ -81,9 +81,9 @@ onRequest.image = async (req, res) => {
     fp.pipe(
       fp.groupBy(dict        => dict[key]),
       dict                   => Object.entries(dict),
-      fp.reduce((acc, [k,v]) => _.set(acc, k, agg(v)), {})
+      fp.reduce((acc, [k,v]) => _.set(freeze(acc), k, agg(v)), {})
     )
-  , x => x)
+  , x => x[0])
 
   aggRes = aggByKeys(['label', 'hashtag', 'date'])
 
@@ -96,11 +96,16 @@ onRequest.image = async (req, res) => {
   formatRes = fp.pipe(
     fp.groupBy(x => x.date),
     x            => Object.keys(x),
-    fp.reduce((acc, date) => _.set(acc, date, ({
-      'used_tags': allTags(posts)[date], 
-      'images': aggRes(posts)[date],
-      'top_3': aggRes(posts)[date]?.top_3
-    })), {})
+    fp.reduce((acc, date) => {
+
+      var { top_3, ...images } = aggRes(posts)[date];
+
+      return _.set(acc, date, ({
+        'used_tags': allTags(posts)[date], 
+        'images': images,
+        'top_3': top_3
+      }))
+    }, {})
   )
 
   res.send(formatRes(posts))

@@ -98,3 +98,7 @@ bulkInsert = (path) => {
     fp.map(obj => storage(obj.images))
   )('./data/mock/best')
 }
+
+/// - fix top_3
+/// - remove top_3 from images
+/// - change ranking from array to object
