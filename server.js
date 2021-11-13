@@ -1,10 +1,13 @@
 const onRequest = require('./functions')
 
 const express = require('express')
+const cors = require('cors')
 const app = express()
 const port = process.env.PORT || 80
 
 var cors = require('cors')
+
+app.use(cors())
 
 app.use(cors())
 
