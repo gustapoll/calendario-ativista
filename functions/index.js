@@ -2,6 +2,11 @@ var fs = require('fs');
 
 var glob = require("glob");
 
+var moment = require('moment')
+var momentRange = require('moment-range')
+
+moment = momentRange.extendMoment(moment)
+
 var _ = require('lodash');
 var fp = require('lodash/fp');
 
@@ -53,6 +58,68 @@ onRequest = {}
 
 onRequest.hashtags = (request, response) => {
   response.send({"hashtags": HASHTAG_LABELS, "tags": TAGS});
+}
+
+// req = {query: {currentMonth: '2020-05'}}
+
+function getContentById(ids, path) {
+  return new Promise((res) => {
+    // don't run if there aren't any ids or a path for the collection
+    if (!ids || !ids.length || !path) return res([]);
+
+    const collectionPath = db.collection(path);
+    let batches = [];
+
+    while (ids.length) {
+      // firestore limits batches to 10
+      const batch = ids.splice(0, 10);
+
+      // add the batch request to to a queue
+      batches.push(
+        new Promise(response => {
+          collectionPath
+            .where(
+              '__name__',
+              'in',
+              [...batch]
+            )
+            .get()
+            .then(results => response(results.docs.map(result => ({ id: result.id, ...result.data()}) )))
+        })
+      )
+    }
+
+    // after all of the data is fetched, return it
+    Promise.all(batches).then(content => {
+      res(content.flat());
+    })
+
+  })
+}
+
+onRequest.tweet = async (req, res) => {
+  params = { currentMonth:  req.query['currentMonth'] }
+
+  inputFormat = /(?:\d{4})-(?:0[1-9]|1[0-2])/
+
+  month = fp.pipe(
+    input => inputFormat.exec(input) ? input : __,
+    month => moment(month, 'YYYY-MM')
+  )(params.currentMonth)
+
+  range = moment().range(moment(month).startOf('month'), moment(month).endOf('month'));
+
+  daysInMonth = [...range.by('days')].map(date => date.format('YYYY-MM-DD'))
+
+  tweets = await getContentById(daysInMonth, "tweets")
+
+  formatRes = fp.pipe(
+    fp.groupBy(dict        => dict.id),
+    dict                   => Object.entries(dict),
+    fp.reduce((acc, [k,v]) => _.set(acc, k, v[0]?.top_tweets ?? []), {}),
+  )
+
+  res.send(formatRes(tweets))
 }
 
 onRequest.image = async (req, res) => {

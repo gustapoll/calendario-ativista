@@ -15,6 +15,8 @@ app.get('/hashtags', onRequest.hashtags);
 
 app.get('/image', onRequest.image)
 
+app.get('/pantone/best_tweets', onRequest.tweet)
+
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`)
 });
