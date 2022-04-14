@@ -12,13 +12,7 @@
       "port": 5001
     },
     "hosting": {
-      "port": 5000,
-      "rewrites": [
-        {
-          "source": "**",
-          "destination": "/index.html"
-        }
-      ]
+      "port": 5000
     },
     "ui": {
       "enabled": true
